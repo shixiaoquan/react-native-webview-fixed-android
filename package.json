@@ -18,7 +18,7 @@
   },
   "dependencies": {
     "prop-types": "15.6.2",
-    "deprecatedPropType": "1.0.0",
+    "deprecated-prop-type": "1.0.0",
     "keymirror": "0.1.1"
   }
 }
