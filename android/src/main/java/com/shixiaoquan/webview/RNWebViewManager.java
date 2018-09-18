@@ -458,13 +458,14 @@ public class RNWebViewManager extends SimpleViewManager<WebView> implements Acti
                                     outputImage.delete();
                                 }
                                 outputImage.createNewFile();
+                                if (Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP) {
+                                    imageUri = Uri.fromFile(outputImage);
+                                } else {
+                                    imageUri = FileProvider.getUriForFile(Context,
+                                            "com.shixiaoquan.webview.fileprovider", outputImage);
+                                }
                             } catch (IOException e) {
                                 e.printStackTrace();
-                            }
-                            if (Build.VERSION.SDK_INT < 24) {
-                                imageUri = Uri.fromFile(outputImage);
-                            } else {
-                                imageUri = FileProvider.getUriForFile(Context, "com.miningpool_app.fileprovider", outputImage);
                             }
                             // 启动相机程序
                             if (ContextCompat.checkSelfPermission(Context, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {

@@ -1,6 +1,21 @@
-
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-          package="com.shixiaoquan.webview">
+    xmlns:tools="http://schemas.android.com/tools"
+    package="com.shixiaoquan.webview">
+
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.CAMERA" />
+
+    <provider
+        tools:replace="android:authorities"
+        android:name="android.support.v4.content.FileProvider"
+        android:authorities="com.shixiaoquan.webview.fileprovider"
+        android:exported="false"
+        android:grantUriPermissions="true">
+        <meta-data
+            tools:replace="android:resource"
+            android:name="android.support.FILE_PROVIDER_PATHS"
+            android:resource="@xml/file_paths" />
+    </provider>
 
 </manifest>
   
