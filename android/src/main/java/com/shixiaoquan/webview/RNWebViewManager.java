@@ -10,6 +10,7 @@
 package com.shixiaoquan.webview;
 
 import android.Manifest;
+import android.annotation.SuppressLint;
 import android.annotation.TargetApi;
 import android.app.Activity;
 import android.content.ActivityNotFoundException;
@@ -128,6 +129,7 @@ public class RNWebViewManager extends SimpleViewManager<WebView> implements Acti
     public static final int COMMAND_STOP_LOADING = 4;
     public static final int COMMAND_POST_MESSAGE = 5;
     public static final int COMMAND_INJECT_JAVASCRIPT = 6;
+    public static final int COMMAND_GO_BACK_FOR_VUE_SPA = 7;
 
     // Use `webView.loadUrl("about:blank")` to reliably reset the view
     // state and release page resources (including any running JavaScript).
@@ -412,6 +414,7 @@ public class RNWebViewManager extends SimpleViewManager<WebView> implements Acti
 
 
             // For Android 4.1
+            @SuppressWarnings("unused")
             public void openFileChooser(ValueCallback<Uri> uploadMsg, String acceptType, String capture) {
                 if (mUploadMessage != null) {
                     mUploadMessage.onReceiveValue(null);
@@ -420,6 +423,8 @@ public class RNWebViewManager extends SimpleViewManager<WebView> implements Acti
                 showPopSelectPic(reactContext);
             }
 
+            // For Android 5.0+
+            @SuppressLint("NewApi")
             public boolean onShowFileChooser(WebView webView, ValueCallback<Uri[]> filePathCallback, FileChooserParams fileChooserParams) {
                 if (mUploadMessage != null) {
                     mUploadMessage.onReceiveValue(null);
@@ -476,7 +481,10 @@ public class RNWebViewManager extends SimpleViewManager<WebView> implements Acti
                             permissionsCheck(Context.getCurrentActivity(), Arrays.asList(Manifest.permission.CAMERA, Manifest.permission.WRITE_EXTERNAL_STORAGE), new Callable<Void>() {
                                 @Override
                                 public Void call() {
-                                    openCamera();
+                                    Intent intent = new Intent("android.media.action.IMAGE_CAPTURE");
+                                    intent.putExtra(MediaStore.EXTRA_OUTPUT, imageUri);
+                                    Activity currentActivity = reactApplicationContext.getCurrentActivity();
+                                    currentActivity.startActivityForResult(intent, TAKE_PHOTO);
                                     return null;
                                 }
                             });
@@ -490,7 +498,10 @@ public class RNWebViewManager extends SimpleViewManager<WebView> implements Acti
                             permissionsCheck(Context.getCurrentActivity(), Collections.singletonList(Manifest.permission.WRITE_EXTERNAL_STORAGE), new Callable<Void>() {
                                 @Override
                                 public Void call() {
-                                    openAlbum();
+                                    Intent intent = new Intent("android.intent.action.GET_CONTENT");
+                                    intent.setType("image/*");
+                                    Activity currentActivity = reactApplicationContext.getCurrentActivity();
+                                    currentActivity.startActivityForResult(intent, CHOOSE_PHOTO); // 打开相册
                                     return null;
                                 }
                             });
