@@ -10,6 +10,7 @@
 package com.shixiaoquan.webview;
 
 import android.Manifest;
+import android.annotation.SuppressLint;
 import android.annotation.TargetApi;
 import android.app.Activity;
 import android.content.ActivityNotFoundException;
@@ -21,6 +22,7 @@ import android.graphics.Picture;
 import android.net.Uri;
 import android.os.Build;
 import android.provider.MediaStore;
+import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
 import android.support.v4.content.FileProvider;
 import android.support.v7.app.AlertDialog;
@@ -49,6 +51,8 @@ import com.facebook.react.common.MapBuilder;
 import com.facebook.react.common.ReactConstants;
 import com.facebook.react.common.build.ReactBuildConfig;
 import com.facebook.react.module.annotations.ReactModule;
+import com.facebook.react.modules.core.PermissionAwareActivity;
+import com.facebook.react.modules.core.PermissionListener;
 import com.facebook.react.uimanager.SimpleViewManager;
 import com.facebook.react.uimanager.ThemedReactContext;
 import com.facebook.react.uimanager.UIManagerModule;
@@ -69,9 +73,13 @@ import java.io.File;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.concurrent.Callable;
 
 import javax.annotation.Nullable;
 
@@ -109,7 +117,6 @@ public class RNWebViewManager extends SimpleViewManager<WebView> implements Acti
     protected static final String REACT_CLASS = "RCTWebView2";
 
 
-
     protected static final String HTML_ENCODING = "UTF-8";
     protected static final String HTML_MIME_TYPE = "text/html";
     protected static final String BRIDGE_NAME = "__REACT_WEB_VIEW_BRIDGE";
@@ -122,6 +129,7 @@ public class RNWebViewManager extends SimpleViewManager<WebView> implements Acti
     public static final int COMMAND_STOP_LOADING = 4;
     public static final int COMMAND_POST_MESSAGE = 5;
     public static final int COMMAND_INJECT_JAVASCRIPT = 6;
+    public static final int COMMAND_GO_BACK_FOR_VUE_SPA = 7;
 
     // Use `webView.loadUrl("about:blank")` to reliably reset the view
     // state and release page resources (including any running JavaScript).
@@ -406,6 +414,7 @@ public class RNWebViewManager extends SimpleViewManager<WebView> implements Acti
 
 
             // For Android 4.1
+            @SuppressWarnings("unused")
             public void openFileChooser(ValueCallback<Uri> uploadMsg, String acceptType, String capture) {
                 if (mUploadMessage != null) {
                     mUploadMessage.onReceiveValue(null);
@@ -414,6 +423,8 @@ public class RNWebViewManager extends SimpleViewManager<WebView> implements Acti
                 showPopSelectPic(reactContext);
             }
 
+            // For Android 5.0+
+            @SuppressLint("NewApi")
             public boolean onShowFileChooser(WebView webView, ValueCallback<Uri[]> filePathCallback, FileChooserParams fileChooserParams) {
                 if (mUploadMessage != null) {
                     mUploadMessage.onReceiveValue(null);
@@ -445,8 +456,8 @@ public class RNWebViewManager extends SimpleViewManager<WebView> implements Acti
     private void showPopSelectPic(final ThemedReactContext Context) {
         String[] items = new String[]{"相机", "相册"};
         AlertDialog.Builder builder = new AlertDialog.Builder(Context);
-        builder.setTitle("提示")
-                .setSingleChoiceItems(items, 0, new DialogInterface.OnClickListener() {
+        builder.setTitle("请选择")
+                .setItems(items, new DialogInterface.OnClickListener() {
                     @Override
                     public void onClick(DialogInterface dialog, int which) {
                         dialog.dismiss();
@@ -462,24 +473,44 @@ public class RNWebViewManager extends SimpleViewManager<WebView> implements Acti
                                     imageUri = Uri.fromFile(outputImage);
                                 } else {
                                     imageUri = FileProvider.getUriForFile(Context,
-                                            "com.shixiaoquan.webview.fileprovider", outputImage);
+                                            Context.getApplicationContext().getPackageName() + ".provider", outputImage);
                                 }
                             } catch (IOException e) {
                                 e.printStackTrace();
                             }
+                            permissionsCheck(Context.getCurrentActivity(), Arrays.asList(Manifest.permission.CAMERA, Manifest.permission.WRITE_EXTERNAL_STORAGE), new Callable<Void>() {
+                                @Override
+                                public Void call() {
+                                    Intent intent = new Intent("android.media.action.IMAGE_CAPTURE");
+                                    intent.putExtra(MediaStore.EXTRA_OUTPUT, imageUri);
+                                    Activity currentActivity = reactApplicationContext.getCurrentActivity();
+                                    currentActivity.startActivityForResult(intent, TAKE_PHOTO);
+                                    return null;
+                                }
+                            });
                             // 启动相机程序
-                            if (ContextCompat.checkSelfPermission(Context, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
-                                //ActivityCompat.requestPermissions(Context, new String[]{Manifest.permission.CAMERA}, 2);
-                            } else {
-                                openCamera();
-                            }
+//                            if (ContextCompat.checkSelfPermission(Context, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
+//                                //ActivityCompat.requestPermissions(Context, new String[]{Manifest.permission.CAMERA}, 2);
+//                            } else {
+//                                openCamera();
+//                            }
                         } else if (which == 1) {
+                            permissionsCheck(Context.getCurrentActivity(), Collections.singletonList(Manifest.permission.WRITE_EXTERNAL_STORAGE), new Callable<Void>() {
+                                @Override
+                                public Void call() {
+                                    Intent intent = new Intent("android.intent.action.GET_CONTENT");
+                                    intent.setType("image/*");
+                                    Activity currentActivity = reactApplicationContext.getCurrentActivity();
+                                    currentActivity.startActivityForResult(intent, CHOOSE_PHOTO); // 打开相册
+                                    return null;
+                                }
+                            });
                             //openAlbum
-                            if (ContextCompat.checkSelfPermission(Context, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
-                                //ActivityCompat.requestPermissions(Context, new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE}, 1);
-                            } else {
-                                openAlbum();
-                            }
+//                            if (ContextCompat.checkSelfPermission(Context, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+//                                //ActivityCompat.requestPermissions(Context, new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE}, 1);
+//                            } else {
+//                                openAlbum();
+//                            }
                         }
                     }
                 })
@@ -507,6 +538,47 @@ public class RNWebViewManager extends SimpleViewManager<WebView> implements Acti
         intent.setType("image/*");
         Activity currentActivity = reactApplicationContext.getCurrentActivity();
         currentActivity.startActivityForResult(intent, CHOOSE_PHOTO); // 打开相册
+    }
+
+    private void permissionsCheck(final Activity activity, final List<String> requiredPermissions, final Callable<Void> callback) {
+
+        List<String> missingPermissions = new ArrayList<>();
+
+        for (String permission : requiredPermissions) {
+            int status = ActivityCompat.checkSelfPermission(activity, permission);
+            if (status != PackageManager.PERMISSION_GRANTED) {
+                missingPermissions.add(permission);
+            }
+        }
+
+        if (!missingPermissions.isEmpty()) {
+            ((PermissionAwareActivity) activity).requestPermissions(missingPermissions.toArray(new String[missingPermissions.size()]), 1, new PermissionListener() {
+                @Override
+                public boolean onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+                    if (requestCode == 1) {
+                        for (int grantResult : grantResults) {
+                            if (grantResult == PackageManager.PERMISSION_DENIED) {
+//                                promise.reject(E_PERMISSIONS_MISSING, "Required permission missing");
+                                return true;
+                            }
+                        }
+                        try {
+                            callback.call();
+                        } catch (Exception e) {
+//                            promise.reject(E_CALLBACK_ERROR, "Unknown error", e);
+                        }
+                    }
+                    return true;
+                }
+            });
+            return;
+        }
+        // all permissions granted
+        try {
+            callback.call();
+        } catch (Exception e) {
+//            promise.reject(E_CALLBACK_ERROR, "Unknown error", e);
+        }
     }
 
     @Override
